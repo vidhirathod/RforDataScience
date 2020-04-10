@@ -1,0 +1,1112 @@
+---
+title: "German Credit Scoring Data"
+author: "Vidhi Rathod"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document:
+    theme: journal
+    toc: yes
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(GGally)
+library(class)
+library(reshape2)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(broom)
+library(DataExplorer)
+library(reshape)
+library(ggpubr)
+library(ROCR)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(boot)
+library(nnet)
+library(mgcv)
+library(gbm)
+```
+
+<img src="images/CreditRiskMngt.jpg" height="300px" width="700px" />
+
+# German Credit Scoring data
+
+## 1.0 Objective
+
+The German credit score data are downloadable from http://archive.ics.uci.edu/ml/datasets/Statlog+(German+Credit+Data)
+
+Goal: Testing out several different supervised learning algorithms over credit data of subjects to find the one that accurately * * * predicts if an individual will be good candidate to loan or will tend to default
+
+Metric: 
+Loss : Asymmetric cost metric is used to calculate Loss.Ever false negative weighs 5 times to a False positive
+Missclassification Rate: Incorrect Classifications/Total Classifications
+Area under the curve(ROC): Area covered under a ROC Curve.
+
+More priority of metrics is : Loss> MCR> AUC
+
+Methodology:
+Random sample a training data set that contains 70% of original data points. 
+Perform exploratory data analysis. Find a best model for Credit Scoring data using logistic regression with AIC and BIC. Draw ROC curve, report the AUC, and present the misclassification rate table of your final model.
+
+Test the out-of-sample performance. 
+
+## 2.0 Initial Set Up 
+
+### 2.1 Package Loading 
+**Required Packages**
+
+* Tidyverse (dplyr, ggplot2..) - Data Read, Manipulation and visualisation
+* Plotly - Interactive Visualization
+* KableExtra - Styling for table (Styling Data Tables within Markdown)
+* gridExtra- Graphical arrangement
+* forecast- Time series and forecasting
+* ggplot2- Graphical representation
+* stringr- string manipulations
+* corrplot-making correlogram
+* knitrr- Dynamic report generation
+
+### 2.2 Data Loading
+
+We have used a seed of : 13383645
+
+```{r echo=TRUE, message=FALSE}
+set.seed(13383645)
+#Reading Data
+german_credit = read.table("http://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data")
+#Assigning variable names
+colnames(german_credit)=c("chk_acct","duration","credit_his","purpose","amount","saving_acct","present_emp","installment_rate","sex","other_debtor","present_resid","property","age","other_install","housing","n_credits","job","n_people","telephone","foreign","response")
+#Response is in 1,2 - we need to change it to 0,1
+german_credit$response = german_credit$response - 1
+
+```
+
+### 2.3 Sampling
+
+Objective: In here we are random sampling the data in 2 parts 70% training and 30% testing
+
+```{r echo=TRUE}
+#Dividing into training and testing dataset
+index <- sample(nrow(german_credit),size = nrow(german_credit)*0.70)
+german_credit_train <- german_credit[index,]
+german_credit_test <- german_credit[-index,]
+
+```
+
+### 2.4 Data Snapshot
+
+```{r}
+kable(head(german_credit_train,10) )  %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% scroll_box(width = "100%", height = "300px")
+
+#head(german_credit,10)
+```
+This German Credit Score classifies people as good or bad borrowers based on their attributes. 
+The response variable is 1 for good borrower or loan and 2 refers to bad borrower or loan.
+For the ease of working on dataset we have changes the response to binary 0,1.
+
+## 3.0 Exploratory Data Analysis
+
+### 3.1 Initial Analysis
+
+**Dimension**
+```{r}
+dimCr<-dim(german_credit)
+```
+
+The dimension of data: `r dimCr`
+
+**Structure**
+```{r}
+str(german_credit)
+```
+Observation : Data is a mixture of Factors and numeric columns
+
+
+**Description**
+
+1. chk_acct: Status of existing checking account
+2. duration: Duration in month
+3. credit_his: Credit history
+4. purpose: Purpose (car,furniture,education)
+5. amount: Credit amount
+6. saving_acct: Savings account/bonds
+7. present_emp: Present employment since
+8. installment_rate: Installment rate in percentage of disposable income
+9. sex: Personal status and sex
+10. other_debtor: Other debtors / guarantors
+11. present_resid:Present residence since
+12. property:Property(real estate,life insurance)
+13. age: Age in years
+14. other_install: Other installment plans(bank,stores,none)
+15. housing: housing(rent,own,free)
+16. n_credit: Number of existing credits at this bank
+17. job: Job
+18. n_people: Number of people being liable to provide maintenance for
+19. telephone: Telephone
+20. foreign: foreign worker
+21. response: yes/no
+
+In order to see how the response variable is affected by other factors, we will regress it on other variables. As it has only 0 and 1 values, we will use binomial regression. 
+
+**Data Quality Check**
+
+Data quality is another very important step in EDA, it's imperative to have good data quality for a optimum analysis.
+
+```{r}
+metadata<-t(introduce(german_credit))
+colnames(metadata)<-"Values"
+metadata
+plot_intro(german_credit)
+```
+
+The good news is that this dataset has no missing/ Abnormal values in dataset.
+The structure looks coherent
+
+### 3.2 Deep Dive 
+
+**Analysis based on Visualization**
+
+**Analysis of Continious Variables**
+```{r}
+par(mfrow=c(2,4))
+boxplot(german_credit$duration, col = "lightblue", xlab="Duration")
+boxplot(german_credit$amount, col = "lightblue", xlab="Amount")
+boxplot(german_credit$installment_rate, col = "lightblue", xlab="Installment Rate")
+boxplot(german_credit$present_resid, col = "lightblue", xlab="Present resid")
+boxplot(german_credit$age, col = "lightblue", xlab="Age")
+boxplot(german_credit$n_credits, col = "lightblue", xlab="Num Credits")
+boxplot(german_credit$n_people, col = "lightblue", xlab="Num People")
+```
+
+```{r eval=FALSE, warning=FALSE, include=FALSE}
+
+#EDA for Continuous Data
+test.m = german_credit[,c(2,5,8,11,13,16,18,21)]
+test.m$response <- as.numeric(test.m$response)
+```
+
+```{r echo=TRUE, warning=FALSE}
+#duration
+g1<- ggplot(german_credit, aes(x = as.factor(response), y = duration, fill = as.factor(response))) + geom_boxplot() + theme(legend.position = "none")
+
+#amount
+g2<-ggplot(german_credit, aes(x = as.factor(response), y = amount, fill = as.factor(response))) + geom_boxplot() +
+  theme(legend.position = "none")
+
+#AGE
+g4<-ggplot(german_credit, aes(x = as.factor(response), y = age, fill = as.factor(response))) + 
+geom_boxplot() + theme(legend.position = "none")
+
+
+
+
+ggarrange(g1, g2,g4,
+                    labels = c("duration", "amount","age"),
+                    ncol = 3, nrow = 1)
+
+```
+
+**Observation**
+
+* From the **age** variable, we see that the median value for bad records is lesser than that of good records, here we can safely assume young people tends to be riskier.
+* The median value and the range of the **duration** variable appears to be on the higher side of bad records as compared to good records
+* For the **amount** variable, we observe that the median values are pretty close for bad and good borrowers 
+
+
+```{r}
+#Installment Rates
+
+g3<-ggplot(german_credit, aes(factor(installment_rate), ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g4<-ggplot(german_credit, aes(chk_acct, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g5<-ggplot(german_credit, aes(credit_his, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g6<-ggplot(german_credit, aes(purpose, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge")
+
+g7<-ggplot(german_credit, aes(saving_acct, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g8<-ggplot(german_credit, aes(other_debtor, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge")
+
+g9<-ggplot(german_credit, aes(sex, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge")
+
+g10<-ggplot(german_credit, aes(other_install, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g11<-ggplot(german_credit, aes(foreign, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+g12<-ggplot(german_credit, aes(present_emp, ..count..)) + 
+  geom_bar(aes(fill = as.factor(response)), position = "dodge") 
+
+
+ggarrange(g3, g4,
+                    labels = c("Installment Rates", "chk_acct"),
+                    ncol = 1, nrow = 2)
+
+ggarrange(g5, g6,
+                    labels = c("credit_his", "purpose"),
+                    ncol = 1, nrow = 2)
+
+ggarrange(g7, g8,
+                    labels = c("saving_acct", "other_debtor"),
+                    ncol = 1, nrow = 2)
+ggarrange(g9, g10,
+                    labels = c("sex", "other_install"),
+                    ncol = 1, nrow = 2)
+ggarrange(g11,g12,
+                    labels = c("foreign","Present_emp"),
+                    ncol = 1, nrow = 2)
+
+```
+
+* The **installment_rate** variable has a significant difference between the good and bad records, we see that bad records have almost the double median value than good ones.
+* For **chk_acct** A11 & A12 do not have much difference between good loans & bad loans buT A13 & A14 have considerably large difference. 
+* For **credit_his**, for categories A32 - A34 we see the number of good credit are greater and for categories A30-A31.
+
+* We observe similar trends in other variables: sex, other_debtor, saving_acct, other_install and foreign. 
+
+## 4.0 Model Selection
+
+### 4.1 Logistic Regression
+
+**Lets make a Full Model to start with**
+
+Objective: As part of best model we try to find the most suitable model by logistic regression using AIC,BIC criterians.
+
+```{r}
+#full model
+g.credit.glm0<- glm(response~., family=binomial, data=german_credit_train)
+summary(g.credit.glm0)
+```
+Observation: We observe that amongst the 20 predictors only a few are significant.
+In order to choose the significant variables we decide to use AIC/BIC approach
+
+#### 4.1.2 Backward AIC
+
+```{r}
+#backward selection
+#AIC
+g.credit.glm.back <- step(g.credit.glm0) # backward selection (if you don't specify anything)
+```
+Selected model:
+
+Step:  AIC=666.84
+response ~ chk_acct + duration + credit_his + purpose + saving_acct + 
+    installment_rate + other_debtor + other_install + housing + 
+    telephone + foreign
+    
+```{r}
+summary(g.credit.glm.back)
+#deviance
+#AIC
+#BIC
+(aicmodel<-glance(g.credit.glm.back)[,c(4,5)])
+
+```
+
+#### 4.1.3 Backward BIC
+
+```{r}
+g.credit.glm.back.BIC <- step(g.credit.glm0, k=log(nrow(german_credit_train))) 
+summary(g.credit.glm.back.BIC)
+```
+**Selected model by BIC:**
+
+Step:  AIC=757.28
+response ~ chk_acct + duration
+
+```{r}
+bicmodel<-glance(g.credit.glm.back.BIC)[,c(4,5)]
+```
+```{r}
+df<-data.frame(rbind(aicmodel,bicmodel))
+row.names(df)<-c("AICmodel","BICmodel")
+df
+```
+
+
+
+Here we observe that BIC being more parsimonious in model selection only selects 2 predictors as significant where as AIC working towards more prediction ability selects 11 predictors.
+
+In this scenario because we desire more prediction ability we select the model selected the AIC criterian.
+
+#### 4.1.4 Model Analysis:
+
+Below is the **in sample** ROC curve:
+**ROC Curve**
+
+**In-sample : Training data**
+```{r}
+pred.gc.train<- predict(g.credit.glm.back, type="response")
+
+pred0 <- prediction(pred.gc.train, german_credit_train$response)
+perf0 <- performance(pred0, "tpr", "fpr")
+
+plot(perf0, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+AUC0<-unlist(slot(performance(pred0, "auc"), "y.values"))
+#0.8496752
+
+```
+Observation: The roc curve looks good and we also observe `r AUC0` as AUC value. As per *Rule of thumb* AUC value > .70 can be considered satisfactory.ROC curve signifies overall measure of goodness of classification, hence a higher value signifies that model has good classification ability.
+
+But this measure is calculated on training sample, which is not a good data to make a decision. Let's check the same for out of sample..
+
+**Confusion Matrix**
+
+Considering the data has asymmetric distribution , we choose cutoff probability as 1/6. The cost function will also change accordingly..
+
+The misclassification rate table is as follows:
+
+```{r}
+pcut1=.16
+
+# get binary prediction
+class.gc.train<- (pred.gc.train>pcut1)*1
+# get confusion matrix
+table(german_credit_train$response, class.gc.train, dnn = c("True", "Predicted"))
+
+```
+**Intepretation**
+
+False positive: 218
+False Negative: 20
+
+Misclassification = False positive + False Negative
+We observe that:
+
+There are 20 candidates that were actually defaulters but were predicted as good borrowers these are called as False negative classification.
+
+There are 218 candidates were actually good borrowers but were predicted as bad borrowers these are called as False positive classification.
+
+If we wish to penalize False negatives more then the weights in cost function will change...
+```{r}
+#cost function define
+costfunc = function(obs, pred.p){
+  pcut=.16
+  weight1 = 5   # define the weight for "true=1 but pred=0" (FN)
+  weight0 = 1    # define the weight for "true=0 but pred=1" (FP)
+  c1 = (obs==1)&(pred.p<pcut)    # count for "true=1 but pred=0"   (FN)
+  c0 = (obs==0)&(pred.p>=pcut)   # count for "true=0 but pred=1"   (FP)
+  cost = mean(weight1*c1 + weight0*c0)  # misclassification with weight
+  return(cost) # you have to return to a value when you write R functions
+} # end of the function
+
+# (equal-weighted) misclassification rate
+MR<- mean(german_credit_train$response!=class.gc.train)
+#asymettric cose
+cost1<-costfunc(class.gc.train,german_credit_train$response)
+# False positive rate
+FPR<- sum(german_credit_train$response==0 & class.gc.train==1)/sum(german_credit_train$response==0)
+# False negative rate (exercise)
+FNR<- sum(german_credit_train$response==1 & class.gc.train==0)/sum(german_credit_train$response==1)
+
+trn.val<-data.frame(cbind(MR,cost1,FPR,FNR,AUC0))
+colnames(trn.val)<-c("MissClassRt","AsyCost","FPR","FNR","AUC")
+rownames(trn.val)<-c("Training Sample")
+trn.val
+```
+**Intepretation**
+
+* MissClassRt: This signifies that 34% of candidates were missclassified.
+* AsyCost: Asymmetric cost based on asymmetric cost function, we considered a cut-off probability 1/6 (equivalent to 5:1 asymmetric cost).
+* FPR: False positive rate signifies that out of total 44% were classified as False positive
+* FNR: False negative rate signifies that out of total 9.4% were classified as False negative
+* AUC: Area under the curve signifies overall strength of classification.
+
+**Out-of-sample : Testing data**
+**ROC Curve**
+
+```{r}
+
+#Part 02 Out of sample prediction
+# apply fitted model to test sample (predicted probabilities)
+predTst <- predict(g.credit.glm.back,german_credit_test, type="response")
+
+pred2 <- prediction(predTst, german_credit_test$response)
+perf2 <- performance(pred2, "tpr", "fpr")
+plot(perf2, colorize=TRUE)
+
+#Get the AUC
+AUC2<-unlist(slot(performance(pred2, "auc"), "y.values"))
+#0.7173563
+
+```
+**Intepretation**
+Observation: The roc curve looks good and we also observe `r AUC2` as AUC value. As per *Rule of thumb* AUC value > .70 can be considered satisfactory.ROC curve signifies overall measure of goodness of classification, hence a higher value signifies that model has good classification ability.
+
+**Confusion Matrix**
+
+Considering the data has asymmetric distribution , we choose cutoff probability as 1/6. The cost function will also change accordingly..
+
+The misclassification rate table is as follows:
+```{r}
+# step 1. get binary classification
+class.predTst<- (predTst>pcut1)*1
+# step 2. get confusion matrix, MR, FPR, FNR
+table(german_credit_test$response, class.predTst, dnn = c("True", "Predicted"))
+```
+**Intepretation**
+
+False positive: 107
+False Negative: 20
+
+Misclassification = False positive + False Negative
+We observe that:
+
+There are 20 candidates that were actually defaulters but were predicted as good borrowers these are called as False negative classification.
+
+There are 107 candidates were actually good borrowers but were predicted as bad borrowers these are called as False Negative.
+
+If we wish to penalize False negatives more then the weights in cost function will change...
+
+```{r}
+# (equal-weighted) misclassification rate
+MR2<- mean(german_credit_test$response!=class.predTst)
+#asym cost
+cost2<-costfunc(class.predTst,german_credit_test$response)
+# False positive rate
+FPR2<- sum(german_credit_test$response==0 & class.predTst==1)/sum(german_credit_test$response==0)
+# False negative rate (exercise)
+FNR2<- sum(german_credit_test$response==1 & class.predTst==0)/sum(german_credit_test$response==1)
+
+test.val<-c(MR2,cost2,FPR2,FNR2,AUC2)
+cols<-c("MR","COST","FPR","FNR","AUC")
+rows<-c("Training set","Testing set")
+
+report<-rbind(trn.val,test.val)
+colnames(report)<-cols
+rownames(report)<-rows
+```
+```{r}
+
+costfunc = function(obs, pred.p){
+    weight1 = 5   # define the weight for "true=1 but pred=0" (FN)
+    weight0 = 1    # define the weight for "true=0 but pred=1" (FP)
+    pcut = .16 
+    c1 = (obs==1)&(pred.p<pcut)    # count for "true=1 but pred=0"   (FN)
+    c0 = (obs==0)&(pred.p>=pcut)   # count for "true=0 but pred=1"   (FP)
+    cost = mean(weight1*c1 + weight0*c0)  # misclassification with weight
+    return(cost) # you have to return to a value when you write R functions
+} # end of the function
+credit.glm.cv<- glm(response~. , family=binomial, data=german_credit) 
+cv.result = cv.glm(data=german_credit, glmfit=credit.glm.cv, cost=costfunc,K=10)
+cv.result$delta[2]
+```
+The cross validated error =.5345
+**Table of Comparision**
+```{r}
+
+kable(report)  %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% scroll_box(width = "100%", height = "170px")
+#report
+```
+**Intepretation**
+
+* MissClassRt: This signifies the candidates were missclassified, we observe that this has increased on testing sample.
+* AsyCost: Asymmetric cost based on asymmetric cost function, we considered a cut-off probability 1/6 (equivalent to 5:1 asymmetric cost).we observe that this has increased on testing sample.
+
+* FPR: False positive rate signifies that out of total XX% were classified as False positive
+* FNR: False negative rate signifies that out of total YY% were classified as False Negative
+* AUC: Area under the curve signifies overall strength of classification.
+
+Our model is not as good to predict the testing values as the training values. FPR and FNR have increased and Area Under the curve has decreased from 85% to 72%. However, 72% is acceptable score and we can conclude that our model is working fairly well.
+
+## 4.2 Cart
+
+CART stands for classification and regression tree.
+
+The distinctiove feature with this algo is that we generally have a asymmetric cost function. In the credit scoring case it means that false negatives (predicting 0 when truth is 1, or giving out loans that end up in default) will cost more than false positives (predicting 1 when truth is 0, rejecting loans that you should not reject).
+
+`Here we make the assumption that false negative cost 5 times of false positive. In real life the cost structure should be carefully researched.`
+```{r}
+credit.rpart0 <- rpart(formula = response ~ ., data = german_credit_train, method = "class")
+
+credit.rpart <- rpart(formula = response ~ . , data = german_credit_train, method = "class", parms = list(loss=matrix(c(0,5,1,0), nrow = 2)))
+```
+*Symmetric Cost*
+```{r}
+pred0<- predict(credit.rpart0, type="class")
+table(german_credit_train$response, pred0, dnn = c("True", "Pred"))
+```
+False negatives are heavy costing so lets, add more penality of 5:1
+
+*Asymmetric Cost*
+**insample**
+```{r}
+pred.in<- predict(credit.rpart, type="class")
+table(german_credit_train$response, pred.in, dnn = c("True", "Pred"))
+```
+As expected our False negatives have reduced.Hence, we select credit.rpart as our model for Binary classification Tree.
+
+Missclassification rate & LOSS Value
+```{r}
+cost <- function(r, pi){
+  weight1 = 5
+  weight0 = 1
+  c1 = (r==1)&(pi==0) #logical vector - true if actual 1 but predict 0
+  c0 = (r==0)&(pi==1) #logical vector - true if actual 0 but predict 1
+  return(mean(weight1*c1+weight0*c0))
+}
+#LOSS
+(insamplecost.df<-cost(german_credit_train$response,pred.in))
+#Misclassification rate
+(insampleMCR.df<-mean(german_credit_train$response!=pred.in))
+
+```
+```{r}
+#roc
+credit.train.pred.in.prob.rpart<- predict(credit.rpart, german_credit_train, type="prob")[,2]
+pred <- prediction(credit.train.pred.in.prob.rpart, german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:.342
+MCR:.331
+AUC:.7986
+**Out of sample Prediction**
+```{r}
+pred.out<- predict(credit.rpart, german_credit_test, type="class")
+table(german_credit_test$response, pred.out, dnn=c("Truth","Predicted"))
+```
+
+Missclassification rate & LOSS Value
+
+```{r}
+#LOSS
+(outsamplecost.df<-cost(german_credit_test$response,pred.out))
+#Misclassification rate
+(outsampleMCR.df<-mean(german_credit_test$response!=pred.out))
+
+
+```
+```{r}
+#roc
+credit.test.pred.out.prob.rpart<- predict(credit.rpart, german_credit_test, type="prob")[,2]
+pred <- prediction(credit.test.pred.out.prob.rpart, german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:.643
+MCR:.43
+AUC:.723
+**Pruning a tree**
+
+The ideal way of creating a binary tree is to construct a large tree and then prune it to an optimum level
+```{r}
+
+credit.rpart_prune <- rpart(formula = response ~ . , data = german_credit_train, method = "class", parms = list(loss=matrix(c(0,5,1,0), nrow = 2)),cp = 0.001)
+
+```
+We have a bushy tree, Now we can try to prune up to a optimum level using plotcp function
+```{r}
+prp(credit.rpart_prune)
+```
+```{r}
+plotcp(credit.rpart_prune)
+
+```
+```{r}
+printcp(credit.rpart_prune)
+```
+xerror gives you the cross-validation (default is 10-fold) error. You can see that the rel error (in-sample error) is always decreasing as model is more complex, while the cross-validation error (measure of performance on future observations) is not. That is why we prune the tree to avoid overfitting the training data.
+```{r}
+credit.tree<-prune(credit.rpart_prune, cp = 0.002)
+```
+#### 4.2.2 Model Assessment
+
+**Insample Prediction**
+```{r}
+credit.train.pred.in<- predict(credit.tree, german_credit_train, type="class")
+table(german_credit_train$response, credit.train.pred.in, dnn=c("Truth","Predicted"))
+```
+Here, we observe that FN are few more than the last tree(made with default parameters). FP although seems to have improved for insample data.
+
+Missclassification rate & LOSS Value
+
+```{r}
+#LOSS
+(insamplecost.pr<-cost(german_credit_train$response,credit.train.pred.in))
+#Misclassification rate
+(insampleMCR.pr<-mean(german_credit_train$response!=credit.train.pred.in))
+
+
+```
+```{r}
+#roc
+credit.train.pred.in.prob<- predict(credit.tree, german_credit_train, type="prob")[,2]
+pred <- prediction(credit.train.pred.in.prob, german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:.295
+MCR:.255
+AUC:.867
+**Out of sample Prediction**
+```{r}
+credit.test.pred.out<- predict(credit.tree, german_credit_test, type="class")
+table(german_credit_test$response, credit.test.pred.out, dnn=c("Truth","Predicted"))
+```
+Missclassification rate & LOSS Value
+
+```{r}
+#LOSS
+(outsamplecost.pr<-cost(german_credit_test$response,credit.test.pred.out))
+#Misclassification rate
+(outsampleMCR.pr<-mean(german_credit_test$response!=credit.test.pred.out))
+
+
+```
+```{r}
+#roc
+credit.test.pred.in.prob<- predict(credit.tree, german_credit_test, type="prob")[,2]
+pred <- prediction(credit.test.pred.in.prob, german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:.673
+MCR:.366
+AUC:.740
+
+
+**What tree do we choose?**
+
+The insample performance is better for pruned tree(but that not what we are concerned about)
+The out of sample Loss is more in pruned tree,but overall MCR is better.
+
+Hence, to choose a tree we need to choose between these to trade-off parameters.
+Here, we need lesser loss the better(we see small difference .67 and .64) but a significant difference between MCR(.36 and .48) between the two.Also AUC is beter for prune Model.
+
+Hence, we choose the pruned tree: `credit.tree`
+
+Please note, we can use different mechanisms to choose the best model such as : AUC, LOSS, MCR.
+
+
+## 4.3 Essemble Methods
+Advanced Tree Models – Bagging, Random Forests, and Boosting
+
+### 4.3.1 Bagging
+
+Bagging stands for Bootstrap and Aggregating. It employs the idea of bootstrap but the purpose is not to study bias and standard errors of estimates. Instead, the goal of Bagging is to improve prediction accuracy. It fits a tree for each bootsrap sample, and then aggregate the predicted values from all these different trees. For more details, you may look at Wikepedia, or you can find the original paper Leo Breiman (1996).
+
+**To my best knowledge, it seems that bagging() won’t take an argument for asymmetric loss. Therefore, the classification results might not be appropriate.Lets check it out...**
+
+```{r}
+credit.bg <- randomForest(as.factor(response)~., data = german_credit_train,mtry=ncol(german_credit_train)-1,ntree=1000)
+credit.bg
+```
+Models sensitivity will be less because the FN are high which is concerning, although FP are less which is good thing.
+```{r}
+plot(credit.bg, lwd=rep(2, 3))
+legend("right", legend = c("OOB Error", "FPR", "FNR"), lwd=rep(2, 3), lty = c(1,2,3), col = c("black", "red", "green"))
+```
+**Insample Analysis**
+
+```{r}
+## confusion matrix
+credit.bg.pred<- predict(credit.bg, type = "prob")[,2]
+optimal.pcut= .16#our assumption
+credit.bg.pred.class<- (credit.bg.pred>optimal.pcut)*1
+table(german_credit_train$response, credit.bg.pred.class, dnn = c("True", "Pred"))
+```
+Lets calculate the Loss and MCR for insample 
+```{r}
+#LOSS
+(BG.insamplecost.pr<-cost(german_credit_train$response,credit.bg.pred.class))
+#Misclassification rate
+(BG.insampleMCR.pr<-mean(german_credit_train$response!=credit.bg.pred.class))
+
+```
+```{r}
+#roc
+pred <- prediction(credit.bg.pred, german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+
+LOSS is (.58)very high because rpart does not have a indefined cost assymetric parameter 
+MCR=.44 Approx
+AUC=.772
+**Out of sample Analysis**
+
+*Please higher value of AUC can also be by fluke*
+```{r}
+## confusion matrix
+optimal.pcut= .16#our assumption
+credit.bg.pred_test<- predict(credit.bg,newdata=german_credit_test, type = "prob")[,2]
+credit.bg.pred.class.test<- (credit.bg.pred_test>optimal.pcut)*1
+table(german_credit_test$response, credit.bg.pred.class.test, dnn = c("True", "Pred"))
+```
+We can see the FN have reduced in Out of sample as well.
+
+Lets calculate the Loss and MCR for insample and out of sample
+Missclassification rate & LOSS Value
+
+```{r}
+#LOSS
+(BG.outsamplecost.pr<-cost(german_credit_test$response,credit.bg.pred.class.test))
+#Misclassification rate
+(BG.outsampleMCR.pr<-mean(german_credit_test$response!=credit.bg.pred.class.test))
+
+```
+```{r}
+#roc
+pred <- prediction(credit.bg.pred_test, german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS=.51
+MCR=.43 
+AUC=.800
+
+### 4.3.2 RandomForest
+
+
+```{r}
+credit.rf <- randomForest(as.factor(response)~., data = german_credit_train,mtry=sqrt(ncol(german_credit_train)-1),ntree=1000)
+credit.rf
+```
+Models sensitivity will be less because the FN are high which is concerning, although FP are less which is good thing.
+```{r}
+plot(credit.rf, lwd=rep(2, 3))
+legend("right", legend = c("OOB Error", "FPR", "FNR"), lwd=rep(2, 3), lty = c(1,2,3), col = c("black", "red", "green"))
+```
+**Insample Analysis**
+
+```{r}
+## confusion matrix
+credit.rf.pred<- predict(credit.rf, type = "prob")[,2]
+optimal.pcut= .16#our assumption
+credit.rf.pred.class<- (credit.rf.pred>optimal.pcut)*1
+table(german_credit_train$response, credit.rf.pred.class, dnn = c("True", "Pred"))
+```
+Note that`FN` are less which is a positive sign..
+
+Lets calculate the Loss and MCR for insample 
+```{r}
+#LOSS
+(rf.insamplecost<-cost(german_credit_train$response,credit.rf.pred.class))
+#Misclassification rate
+(rf.insampleMCR<-mean(german_credit_train$response!=credit.rf.pred.class))
+
+```
+```{r}
+#roc
+pred <- prediction(credit.rf.pred, german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+
+LOSS=.58
+MCR=.44 
+AUC=.781
+
+**Out of sample Analysis**
+
+```{r}
+## confusion matrix
+credit.rf.pred_test<- predict(credit.rf,newdata=german_credit_test, type = "prob")[,2]
+optimal.pcut= .16#our assumption
+credit.rf.pred.class.test<- (credit.rf.pred_test>optimal.pcut)*1
+table(german_credit_test$response, credit.rf.pred.class.test, dnn = c("True", "Pred"))
+```
+
+Lets calculate the Loss and MCR for insample and out of sample
+Missclassification rate & LOSS Value
+
+```{r}
+#LOSS
+(rf.outsamplecost<-cost(german_credit_test$response,credit.rf.pred.class.test))
+#Misclassification rate
+(rf.outsampleMCR<-mean(german_credit_test$response!=credit.rf.pred.class.test))
+
+```
+```{r}
+#roc
+pred <- prediction(credit.rf.pred_test, german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS=.5133
+MCR=.46
+AUC=.805
+
+### 4.3.3 Gradient Boosting
+
+Boosting builds a number of small trees, and each time, the response is the residual from last tree. It is a sequential procedure. We use gbm package to build boosted trees.
+
+```{r}
+credit.bo= gbm(response~., data = german_credit_train, distribution = "bernoulli",n.trees = 100, shrinkage = 0.01, interaction.depth = 8)
+summary(credit.bo)
+```
+```{r}
+par(mfrow=c(1,3))
+plot(credit.bo, i="chk_acct")
+plot(credit.bo, i="duration")
+plot(credit.bo, i="purpose")
+
+```
+**Insample analysis**
+```{r}
+pred.credit.bo.in<- predict(credit.bo, newdata = german_credit_train,type ="response" ,n.trees =100 )
+optimal.pcut= .16#our assumption
+credit.bo.pred.class<- (pred.credit.bo.in>optimal.pcut)*1
+table(german_credit_train$response, credit.bo.pred.class, dnn = c("True", "Pred"))
+
+
+```
+```{r}
+#LOSS
+(bo.insamplecost<-cost(german_credit_train$response,credit.bo.pred.class))
+#Misclassification rate
+(bo.insampleMCR<-mean(german_credit_train$response!=credit.bo.pred.class))
+
+```
+
+```{r}
+#class(pred.credit.bo.in)
+pred <- prediction(pred.credit.bo.in, german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:0.6985714
+MCR:0.6985714
+AUC:.886
+
+**Out of sample analysis**
+```{r}
+pred.credit.bo.out<- predict(credit.bo, newdata = german_credit_test,type ="response" ,n.trees =100 )
+optimal.pcut= .16#our assumption
+credit.bo.pred.class<- (pred.credit.bo.out>optimal.pcut)*1
+table(german_credit_test$response, credit.bo.pred.class, dnn = c("True", "Pred"))
+
+
+```
+```{r}
+#LOSS
+(bo.outsamplecost<-cost(german_credit_test$response,credit.bo.pred.class))
+#Misclassification rate
+(bo.outsampleMCR<-mean(german_credit_test$response!=credit.bo.pred.class))
+
+```
+
+```{r}
+pred <- prediction(pred.credit.bo.out, german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:0.703
+MCR:0.703
+AUC:.819
+
+## 4.4 GAM
+
+```{r}
+n <- names(german_credit_train)
+cont<-c("duration","age","amount","response")
+f <- as.formula(paste("response ~s(duration)+s(age)+s(amount) +", paste(n[!n %in% cont], collapse = " + ")))
+f
+credit.gam <- gam(formula = f, family=binomial,data=german_credit_train);
+summary(credit.gam)
+```
+
+```{r}
+plot(credit.gam, shade=TRUE,seWithMean=TRUE,scale=0, pages = 1)
+```
+```{r}
+AIC(credit.gam)
+BIC(credit.gam)
+credit.gam$deviance
+```
+We can notice that even the continious variables in the data do not have a non-linear distribution. This is backed up by the above plots where we can see a straight line
+
+**Insample Performance**
+```{r}
+pcut.gam <- .16
+prob.gam.in<-predict(credit.gam,german_credit_train,type="response")
+pred.gam.in.class<-(prob.gam.in>=pcut.gam)*1
+table(german_credit_train$response,pred.gam.in.class,dnn=c("Observed","Predicted"))
+```
+FN : Looks fairly well but the FP looks really high
+
+```{r}
+#LOSS
+(gam.insamplecost<-cost(german_credit_train$response,pred.gam.in.class))
+#Misclassification rate
+(gam.insampleMCR<-mean(german_credit_train$response!=pred.gam.in.class))
+
+```
+
+```{r}
+pred <- prediction(as.numeric(prob.gam.in),german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS: .471
+MCR: .351
+AUC: .834
+
+**Out of sample Performance**
+```{r}
+pcut.gam <- .16
+prob.gam.out<-predict(credit.gam,german_credit_test,type="response")
+pred.gam.out.class<-(prob.gam.out>=pcut.gam)*1
+table(german_credit_test$response,pred.gam.out.class,dnn=c("Observed","Predicted"))
+```
+FN : Looks fairly well but the FP looks really high
+
+```{r}
+#LOSS
+(gam.out.samplecost<-cost(german_credit_test$response,pred.gam.out.class))
+#Misclassification rate
+(gam.out.sampleMCR<-mean(german_credit_test$response!=pred.gam.out.class))
+
+```
+```{r}
+pred <- prediction(as.numeric(prob.gam.out),german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:.496
+MCR: .390
+AUC: .791
+
+## 4.5 Neural Net
+
+
+```{r}
+credit.nnet <- nnet(response~., data=german_credit_train, size=8,decay=0.003, maxit=500)
+```
+**Insample Analysis**
+```{r}
+prob.nnet= predict(credit.nnet,german_credit_train)
+pred.nnet = as.numeric(prob.nnet > 0.16)
+table(german_credit_train$response,pred.nnet, dnn=c("Observed","Predicted"))
+```
+
+```{r}
+#LOSS
+(nnet.insamplecost<-cost(german_credit_train$response,pred.nnet))
+#Misclassification rate
+(nnet.insampleMCR<-mean(german_credit_train$response!=pred.nnet))
+
+```
+
+```{r}
+pred <- prediction(prob.nnet,german_credit_train$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS:0.274
+MCR:.108
+AUC:.737
+
+**Out of sample Analysis**
+```{r}
+prob.nnet.out= predict(credit.nnet,german_credit_test)
+pred.nnet.out = as.numeric(prob.nnet.out > 0.16)
+table(german_credit_test$response,pred.nnet.out, dnn=c("Observed","Predicted"))
+```
+
+```{r}
+#LOSS
+(nnet.insamplecost<-cost(german_credit_test$response,pred.nnet.out))
+#Misclassification rate
+(nnet.insampleMCR<-mean(german_credit_test$response!=pred.nnet.out))
+
+```
+
+```{r}
+pred <- prediction(prob.nnet.out,german_credit_test$response)
+perf <- performance(pred, "tpr", "fpr")
+plot(perf, colorize=TRUE)
+
+```
+```{r}
+#Get the AUC
+unlist(slot(performance(pred, "auc"), "y.values"))
+```
+LOSS: .74
+MCR:.30
+AUC: .737
+
+## 5.0 Insights
+
+<img src="images/Results.png" height="1000px" width="750px" />
+
+**Conclusion:**
+
+Ensemble methods we observe are not performing well on this data set. The reason is they do not have a asymmetric cost setting functionality as in rpart. GAM do take a lead here and outperform all other algorithms
+
+
