@@ -1,0 +1,22 @@
+# German Credit Scoring 
+
+## Objective
+
+The German credit score data are downloadable from http://archive.ics.uci.edu/ml/datasets/Statlog+(German+Credit+Data)
+
+Goal: Testing out several different supervised learning algorithms over credit data of subjects to find the one that 
+accurately predicts if an individual will be good candidate to loan or will tend to default
+
+Metric: 
+Loss : Asymmetric cost metric is used to calculate Loss.Ever false negative weighs 5 times to a False positive
+Missclassification Rate: Incorrect Classifications/Total Classifications
+Area under the curve(ROC): Area covered under a ROC Curve.
+
+More priority of metrics is : Loss> MCR> AUC
+
+Methodology:
+Random sample a training data set that contains 70% of original data points. 
+Perform exploratory data analysis. Find a best model for Credit Scoring data using logistic regression with AIC and BIC. 
+Draw ROC curve, report the AUC, and present the misclassification rate table of your final model.
+
+Test the out-of-sample performance. 
