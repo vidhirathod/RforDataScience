@@ -1,0 +1,19 @@
+# All about BOSTON HOUSING
+
+If you have ever learned Data science or Machine learning this dataset needs no introduction. Most statisticians use it extensively either to learn ML algos or explain them. 
+What makes this dataset unique is its complexity to predict the response variable. Most algorithms cannot accurately predict house prices. 
+
+Lets try that.....!
+
+Model: Regression Based
+
+* Number of Instances: 506
+
+* Number of Attributes: 13 continuous attributes (including "class"
+                         attribute "MEDV"), 1 binary-valued attribute.
+                         
+Goal: Accuratly predict Housing prices in Boston area
+
+Metric: Mean square error, Cross Validation error
+
+Testing methodology: Divide the dataset into testing and Training,Model created on training used to predict testing data house prices
