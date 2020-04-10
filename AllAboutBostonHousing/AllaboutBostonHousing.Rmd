@@ -1,0 +1,1056 @@
+---
+title:  'All about Boston Housing'
+subtitle: 'House price Prediction ability comparision of various algorithmns'
+author: 'Vidhi Rathod'
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    theme: journal
+    toc: yes
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+<img src="images/BostonStreet.jpg" height="300px" width="900px" />
+
+
+# Boston Housing:
+
+If you have ever learned Data science or Machine learning this dataset needs no introduction. Most statisticians use it extensively either to learn ML algos or explain them. 
+What makes this dataset unique is its complexity to predict the response variable. Most algorithms cannot accurately predict house prices. 
+
+I here will try to analyze how well Linear regression can do it versus Decision Trees...
+
+## 1.0 Attributes Informtion:
+
+The Boston Housing Dataset consists of price of houses in various places in Boston. Alongside with price, the dataset also provide information such as Crime (CRIM), areas of non-retail business in the town (INDUS), the age of people who own the house (AGE), and there are many other attributes that available.
+However, because we are going to use R, we can import it right away from the MASS Package itself. In this story, we will use several R libraries as required here.
+
+* Number of Instances: 506
+
+* Number of Attributes: 13 continuous attributes (including "class"
+                         attribute "MEDV"), 1 binary-valued attribute.
+
+* Attribute Information:
+
+    1. CRIM      per capita crime rate by town
+    2. ZN        proportion of residential land zoned for lots over 
+                 25,000 sq.ft.
+    3. INDUS     proportion of non-retail business acres per town
+    4. CHAS      Charles River dummy variable (= 1 if tract bounds 
+                 river; 0 otherwise)
+    5. NOX       nitric oxides concentration (parts per 10 million)
+    6. RM        average number of rooms per dwelling
+    7. AGE       proportion of owner-occupied units built prior to 1940
+    8. DIS       weighted distances to five Boston employment centres
+    9. RAD       index of accessibility to radial highways
+    10. TAX      full-value property-tax rate per $10,000
+    11. PTRATIO  pupil-teacher ratio by town
+    12. B        1000(Bk - 0.63)^2 where Bk is the proportion of blacks 
+                 by town
+    13. LSTAT    % lower status of the population
+    14. MEDV     Median value of owner-occupied homes in $1000's
+
+* Missing Attribute Values:  None.
+
+As our goal is to develop a model that has the capacity of predicting the value of houses, we will split the dataset into features and the target variable. 
+
+## 2.0 Initial Set Up 
+
+### 2.1 Package Loading 
+**Required Packages**
+
+* Tidyverse (dplyr, ggplot2..) - Data Read, Manipulation and visualisation
+* Plotly - Interactive Visualization
+* KableExtra - Styling for table (Styling Data Tables within Markdown)
+* gridExtra- Graphical arrangement
+* forecast- Time series and forecasting
+* ggplot2- Graphical representation
+* stringr- string manipulations
+* corrplot-making correlogram
+* knitrr- Dynamic report generation
+```{r}
+library(dplyr)
+library(plyr)
+library(MASS) #this data is in MASS package
+library(DataExplorer)
+library(ggpubr)
+library(leaps)
+library(glmnet)
+library("kableExtra")
+library(broom)
+library(boot)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library("gbm")
+library("mgcv")
+library(neuralnet)
+library(mgcv)
+```
+
+### 2.2 Data Loading
+
+```{r}
+boston.data <- data(Boston)
+dim(Boston)
+nam<-names(Boston)
+```
+Dimension of data 506 rows and 14 columns
+The names of attributes are : ``r nam``
+```{r}
+str(Boston)
+```
+Observation: Most columns are quantitative, House prices are in medv varaible.
+
+
+
+## 3.0 Exploratory Data Analysis 
+
+### 3.1 Initial Analysis
+
+**Snapshot of data**
+
+```{r}
+kable(head(Boston,10))  %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% scroll_box(width = "100%", height = "250px")
+
+```
+
+**Data Quality Check**
+
+Data quality is another very important step in EDA, its imperative to have good data quality for a optimum analysis.
+
+```{r}
+metadata<-t(introduce(Boston))
+colnames(metadata)<-"Values"
+metadata
+plot_intro(Boston)
+```
+
+The good news is that this dataset has no missing/ Abnormal values in dataset.
+The structure looks coherent
+
+### 3.2 Deep Dive 
+
+**Analysis based on Visualization**
+
+Density plots are used to observe the distribution of a variable in a dataset. ... An advantage of Density Plots over Histograms is that they're better at determining the distribution shape because they're not affected by the number of bins. 
+
+```{r}
+# Basic density plot with mean line and marginal rug
+crim<-ggdensity(Boston, x = "crim", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+zn<-ggdensity(Boston, x = "zn", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+indus<-ggdensity(Boston, x = "indus", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+chas<-ggdensity(Boston, x = "chas", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+nox<-ggdensity(Boston, x = "nox", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+rm<-ggdensity(Boston, x = "rm", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+age<-ggdensity(Boston, x = "age", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+dis<-ggdensity(Boston, x = "dis", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+rad<-ggdensity(Boston, x = "rad", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+tax<-ggdensity(Boston, x = "tax", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+ptratio<-ggdensity(Boston, x = "ptratio", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+black<-ggdensity(Boston, x = "black", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+lstat<-ggdensity(Boston, x = "lstat", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+medv<-ggdensity(Boston, x = "medv", 
+          fill = "#0073C2FF", color = "#0073C2FF",
+          add = "mean", rug = TRUE)
+  
+
+figure1 <- ggarrange(crim, zn, indus,chas,
+                    labels = c("1", "2", "3","4"),
+                    ncol = 2, nrow = 2)
+figure2 <- ggarrange(nox,rm,age,dis,
+                    labels = c("5", "6", "7","8"),
+                    ncol = 2, nrow = 2)
+figure3 <- ggarrange(rad,tax,ptratio,black,
+                    labels = c("9", "10", "11","12"),
+                    ncol = 2, nrow = 2)
+figure4 <- ggarrange(lstat,medv,
+                    labels = c("11","12"),
+                    ncol = 2, nrow = 1)
+figure1;figure2;figure3;figure4
+```
+
+**Observation**
+
+* crim, zn,chas,black are highly skewed
+* indus, rad, tax are bimodal
+* age,dis are skewed
+* nox,ptratio, lstat and  are also slightly skewed.
+* rm and medv is unimodal and well shaped.
+
+
+
+**Correlation analysis **
+Correlation matrix can help us understand the association between the variables in one snapshot..
+
+```{r}
+plot_correlation(na.omit(Boston), maxcat = 2L)
+```
+
+**Observation:**
+
+Response variable is highly correlated with lstat & moderately correlated with ptratio, indus, nox, tax.
+Strong correlation is also present between various predictors.
+
+## 4.0 Linear Regression 
+
+### 4.1 Fit a Model
+
+Here,fitting a model using Linear regression 
+First we need to split the data into training and testing sample
+
+**Data split**
+
+7:3 split split on data is made
+```{r}
+set.seed(1338364)
+sample_index <- sample(nrow(Boston),nrow(Boston)*0.70)
+Boston_train <- Boston[sample_index,]
+Boston_test <- Boston[-sample_index,]
+```
+
+#### 4.1.2 FIT a full model
+
+```{r}
+#full model
+model_full <- lm(medv~., data=Boston_train)#SMALL R SQUARE
+modelFullSummary<-summary(model_full)
+modelFullSummary
+```
+**Observation**
+
+Except age and indus all variables are significant as per pvalue
+
+#### 4.1.2 Best Subsets
+
+```{r}
+subset_reg<-regsubsets(medv~.,
+                       Boston_train,
+                       nbest=1,#ranks in output
+                       nvmax=14) #max variables to be considered
+summary(subset_reg)
+plot(subset_reg,scale="bic")
+
+```
+**Observation**
+
+Here we observe that indus and age are insignificant variables.
+This was also predicted on the basis of pvalue.
+Hence, we can drop indus and age variables
+
+#### 4.1.3 Stepwise Approach
+
+Note ,Because this is prediction problem we need to use AIC criterian to choose a model. Bic being more parsimonious in approach generally chooses smallest possible model.
+
+```{r include=FALSE}
+#Stepwise
+
+#create null & full model
+nullmodel=lm(medv~1, data=Boston_train)
+fullmodel=lm(medv~., data=Boston_train)
+
+
+#forward
+
+model_step_f <- step(nullmodel, scope=list(lower=nullmodel, 
+                                           upper=fullmodel), 
+                     direction='forward')
+#summary(model_step_f)
+#backward
+
+model_step_b <- step(fullmodel, 
+                     direction='backward')
+
+
+#summary(model_step_b)
+#stepwise
+model_step_s <- step(nullmodel, scope=list(lower=nullmodel, 
+                                           upper=fullmodel), 
+                     direction='both')
+
+#summary(model_step_s)
+```
+**Forward summary**
+```{r}
+summary(model_step_f)
+```
+**Backward summary**
+```{r}
+summary(model_step_b)
+```
+**Stepwise Summary**
+```{r}
+summary(model_step_s)
+```
+
+
+**Observation**
+
+Forward, backward, stepwise and best subset, even p value approach select the same model. Hence we drop the (indus and age )insignificant variables.
+Apart from these approaches lets also try to observe the outcome of a more advanced approach:Lasso
+
+#### 4.1.4 Regularization
+
+In short, ridge regression and lasso are regression techniques optimized for prediction, rather than inference.
+
+Normal regression gives you unbiased regression coefficients (maximum likelihood estimates "as observed in the data-set").
+
+Ridge and lasso regression allow you to regularize ("shrink") coefficients. This means that the estimated coefficients are pushed towards 0, to make them work better on new data-sets ("optimized for prediction"). This allows you to use complex models and avoid over-fitting at the same time.
+
+Lets check it our the Lasso on this dataset..
+
+```{r}
+lasso_fit = glmnet(x = as.matrix(Boston_train[, -c(which(colnames(Boston)=='medv'))]), 
+                   y = Boston_train$medv, 
+                   alpha = 1)#Is lasso penlity alpha =0 become the ridge penality
+
+#lasso_fit
+#lambda = 0.5
+coef(lasso_fit,s=0.5)
+
+#lambda = 1
+coef(lasso_fit,s=1)
+```
+
+Randomly choosing the shrinkage variable we observe that with increase in the value of "s" aka "Lambda" of Lasso valiable selection the coefficient of predictors shrinks.
+
+Now, lets try to use cross validation to select the optimum value of this parameter:
+Here, we are using a 5 fold cross validation
+
+```{r}
+#use 5-fold cross validation to pick lambda
+cv_lasso_fit = cv.glmnet(x = as.matrix(Boston_train[, -c(which(colnames(Boston)=='medv'))]), 
+                         y = Boston_train$medv, 
+                         alpha = 1, 
+                         nfolds = 5)# no of folds in CV
+plot(cv_lasso_fit)
+lambdamin<-cv_lasso_fit$lambda.min
+lambda1se<-cv_lasso_fit$lambda.1se
+```
+**Observation**
+
+Here, it is observed that minimum MSE occours at `r lambdamin` and MSE 1 standard error occours at `r lambda1se`.
+
+Lets have a look at the coefficients for these 2 values of Lambda
+
+```{r}
+coef(lasso_fit,lambdamin)
+coef(lasso_fit,lambda1se)
+```
+**Inference**
+
+lambda.min Shrinks indus and age variables, this means this would suggest the same model as by above mechanisms.
+We will use lambda.1se as it shrinks the coefficients much more that lambda.min
+
+```{r}
+data_train.lasso.X = as.matrix(Boston_train[, -c(which(colnames(Boston_train)=='medv'))])
+
+pred.lasso.train<- predict(lasso_fit, newx=data_train.lasso.X, s=lambda1se, type = "response")
+mean(pred.lasso.train-Boston_train$medv)^2
+```
+```{r}
+data_test.lasso.X = as.matrix(Boston_test[, -c(which(colnames(Boston_test)=='medv'))])
+
+pred.lasso.test<- predict(lasso_fit, newx=data_test.lasso.X, s=lambda1se, type = "response")
+mean(pred.lasso.test-Boston_test$medv)^2
+```
+Here, we observe that MSE and MSPE Values have been reduced to very small values.
+Key takeaways:
+
+*Lasso suggests same predictors as that of Best Sussets,Forward,Backward,stepwise. 
+*It shrinks the values of coefficients for a optimum value of lambda we choose from the plotcp graph.
+*The model has very low in-sample & out-sample error values.
+
+Final model:
+
+As with most approaches we got the same result; to drop indus and age predictors. On the other hand Lasso had a different take for lambda1se(@ 1 standard error) by additionally shrinking the coefficients and making indus, age, zn,rad as = 0.
+In this scenario we are not much bothered by for multicollinearity and we also have good number of data rows as compared to predictors. Hence we need not go for the Lasso variable selection using Regularization.
+
+**So what model do we select?**
+Here, we keep our approach simple and choose the model based on the other variable selection methodology we employed above(pvalue , best, forward, bacward, stepwise, both).
+
+We select the model that has the lowest value of AIC(Predicting power) as we are more interested in the virtue of correct prediction.
+The full model has slightly higher value of AIC than the model suggested by selection mechanisms employed
+(Best Sussets,Forward,Backward,stepwise)
+
+
+```{r}
+#pvalue , best, forward, bacward, stepwise both
+#drop indus & age
+model_sel <- lm(medv ~ lstat + rm + ptratio + black + dis + nox + chas + zn +   rad + tax + crim, data=Boston_train)
+model_selSummary<-summary(model_sel)
+
+#lasso 1se model
+model_sel_lso <- lm(medv ~ lstat + rm + ptratio + black + dis +  chas, data=Boston_train)
+model_sel_lso_Summary<-summary(model_sel_lso)
+
+modelVec<-c("Full model","Model_PvBeFwBkStLmin")
+
+OpDF<-cbind(modelVec,
+      rbind(glance(model_full),
+            glance(model_sel)
+            #,glance(model_sel_lso)
+            )
+      )
+OpDF$MSE<-OpDF$sigma^2
+rel_cols<-c("modelVec","sigma","MSE","r.squared","adj.r.squared","AIC","BIC")
+
+kable(head(OpDF[,rel_cols]))  %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% scroll_box(width = "100%", height = "170px")
+
+```
+### 4.2 Residual Dignosis
+
+**Full model**: All predictors
+
+lm(formula = medv ~ ., data = Boston_train)
+```{r}
+par(mfrow = c(2, 2))  # Split the plotting panel into a 2 x 2 grid
+plot(model_full)# Plot the model information
+```
+**Selected model**: All predictors all but indus and age
+
+lm(formula = medv ~ lstat + rm + ptratio + black + dis + nox + 
+    chas + zn + rad + tax + crim, data = Boston_train)
+
+```{r}
+par(mfrow = c(2, 2))  # Split the plotting panel into a 2 x 2 grid
+plot(model_sel)
+```
+**Lasso Model**: Predictors suggested by 1se of Lasso 
+
+lm(formula = medv ~ lstat + rm + ptratio + black + dis + chas, 
+    data = Boston_train)
+```{r}
+par(mfrow = c(2, 2))  # Split the plotting panel into a 2 x 2 grid
+plot(model_sel_lso)
+```
+
+**Inference**
+
+Most plots look quite similar, We do observe some pattern in Residual plots. As we already know ideally there should just be a random scatter in Residual plot & Scalled residuals. We may need to investigate the model using heuristic approach further.
+
+Normality is met to a certain extent although a marginal right skewness is observed.
+
+### 4.3 Model Selection:
+
+So, which model should we select from there 3, but before that what should be our criteria of selection...
+
+Alert! when compairing models with different predictors one should use Adjr2, AIC  or BIC. MSE generally decrease with increase number of predictors also R2 tends to increase with number of predictors, hence they are not good criterians for model comparision
+
+```{r}
+
+kable(head(OpDF[,rel_cols]))  %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive")) %>% scroll_box(width = "100%", height = "170px")
+
+
+```
+
+
+Looking at Adj R2 and AIC values we decide to select the model: Model_PvBeFwBkStLmin
+
+This model was suggested by stepwise, Best subset,Pvalue approach,Forward, Backward.
+
+We understand that when comparing models with different set of predictors AIC, Adj R2, BIC are better criterias than SSE, MSE, R2. This is because these parameters generally tend to give better results with addition of more and more predictors.
+
+## 5.0 Validation 
+
+**out-of-sample performance**
+
+Lets try to test the out-of-sample performance. Using final linear model built from (i) on the 70% of original data, test with the remaining 30% testing data. (Try predict() function in R.) Report out-of-sample model MSE etc.
+```{r}
+pred.test.BH<- predict(model_sel,Boston_test[,-14], type="response")
+tstmse<-mean((Boston_test[,14]-pred.test.BH)^2)
+tstmse
+```
+**Observation**
+
+The test MSE(Mean square error of testing sample) is `r tstmse`, to our surprise it's even less that Training sample MSE 24.18.
+
+In general model is expected to underperform on test data than on train data, but sometimes it is out performs also. This can be by fluke.
+
+This value may fluctuate based on initial sapmling of data, hence a more reliable indicator of model perfomance is Cross validation error.
+
+Let's see what is the CV value of the model...
+
+**Cross validation**
+
+Let's use 3-fold cross validation. (Try cv.glm() function in R on the ORIGINAL 100% data.) Does CV yield similar answer as above?
+
+```{r}
+model.glm1 = glm(medv~lstat + rm + ptratio + black + dis + nox + 
+    chas + zn + rad + tax + crim, data = Boston)
+#loocv 
+cv.glm(data = Boston, glmfit = model.glm1)$delta[2]
+#10 FOLD CV
+cv.glm(data = Boston, glmfit = model.glm1, K = 10)$delta[2]
+#3 FOLD CV
+cv.glm(data = Boston, glmfit = model.glm1, K = 3)$delta[2]
+
+```
+**Observation**
+Here, we observe that the Validation set approach gave a smaller MSE than cross validation.
+As we increased the number of folds we see that MSE increases marginally
+
+## 6.0 Decision Tree 
+
+Lets try to fit a regression tree (CART) on the same data; repeat the above step of predicting the error to check how well do Trees perform on this data.
+
+```{r}
+boston.largetree <- rpart(formula = medv ~ ., data = Boston_train, cp = 0.001)
+#Try plot it yourself to see its structure.
+
+prp(boston.largetree)
+#The plotcp() function gives the relationship between 10-fold cross-validation error in the training set and size of tree.
+
+plotcp(boston.largetree)
+printcp(boston.largetree)
+
+```
+**Observation**
+xerror: does not reduce post nsplit=10, hence we choose cp= 0.0052405(corresponding to 10 ) to prune the large tree
+This is much clear looking at the plot where we clearly see that 10 fold cross validation error does not reduce after 10 splits.
+
+**Tree prune: **
+```{r}
+#create a tree
+boston.trn.dt.p<-prune(boston.largetree,cp=0.0052405)
+#plot a tree
+prp(boston.trn.dt.p,digits = 5, extra = 1)
+```
+*For 354 observations in training data*
+
+**MSE /MSPE**
+
+In-sample & Out-of-sample prediction
+
+```{r}
+#In-sample prediction
+boston.train.pred.tree = predict(boston.trn.dt.p)
+#Out-of-sample prediction
+boston.test.pred.tree = predict(boston.trn.dt.p,Boston_test)
+
+(MSE.tree<- sum((Boston_train$medv-boston.train.pred.tree)^2)/nrow(Boston_train))
+(MSPE.tree <- sum((Boston_test$medv-boston.test.pred.tree)^2)/nrow(Boston_test))
+
+```
+```{r}
+#In-sample prediction
+boston.train.pred.tree.full = predict(boston.largetree)
+#Out-of-sample prediction
+boston.test.pred.tree.full = predict(boston.largetree,Boston_test)
+
+(MSE.tree<- sum((Boston_train$medv-boston.train.pred.tree)^2)/nrow(Boston_train))
+(MSPE.tree <- sum((Boston_test$medv-boston.test.pred.tree)^2)/nrow(Boston_test))
+
+```
+**Observation**
+
+The mse(in-sample) is `r MSE.tree` which is less that MSE(in-sample) from Linear regression model.
+The mse(out of sample) aka MSPE is `r MSPE.tree` which is although more that MSE(in-sample) but less that MSPE from Linear regression model.
+
+**CV Decision Trees**
+```{r}
+set.seed(450)
+cv.error <- NULL
+k <- 10
+
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k){
+    index <- sample(1:nrow(Boston),round(0.9*nrow(Boston)))
+    train.cv <- Boston[index,]
+    test.cv <- Boston[-index,]
+    
+    boston.ct.cv<- rpart(formula = medv ~ ., data = train.cv, cp = 0.0052405)
+    
+    pt<-predict(boston.ct.cv, test.cv, n.trees = 1000)
+    cv.error[i]<-mean((test.cv$medv-pt)^2)
+    
+    pbar$step()
+}
+cv_ct<-mean(cv.error)
+```
+The cross validation error for CT : `r cv_ct`
+
+**Plot of predicted vs actual values**
+```{r}
+par(mfrow=c(1,2))
+plot(boston.train.pred.tree,Boston_train$medv,col=6, lwd=0, xlab = "predicted values", ylab = "Actual Values", main="Training data or OOBE")
+abline(c(0,1),col=9)
+
+plot(boston.test.pred.tree,Boston_test$medv,col=6, lwd=0, xlab = "predicted values", ylab = "Actual Values",main="Testing data")
+abline(c(0,1),col=9)
+```
+
+**Observation**
+
+The mse(in-sample) is `r MSE.tree` which is less that MSE(in-sample) from Linear regression model.
+The mse(out of sample) aka MSPE is `r MSPE.tree` which is although more that MSE(in-sample) but less that MSPE from Linear regression model.
+
+**Inference**
+
+## 7.0 Bagging
+```{r}
+#
+boston.bag<- randomForest(medv~., data = Boston_train,mtry=ncol(Boston_train)-1,ntree=500, importance=TRUE)
+boston.bag
+
+```
+**Out of bag error**
+```{r}
+hist(boston.bag$mse,col=3, lwd=2)
+plot(boston.bag$mse,type='l', col=2, lwd=2, xlab = "ntree", ylab = "OOB Error") 
+
+```
+**MSE on Training Sample**
+```{r}
+boston.bag.pred.TR<- predict(boston.bag)
+train.mse.bag<-mean((Boston_train$medv-boston.bag.pred.TR)^2)
+train.mse.bag
+```
+Hence, MSR is actually OOB Error on training data.
+
+**MSPE on testing Sample**
+```{r}
+boston.bag.pred<- predict(boston.bag, Boston_test)
+test.mse.bag<-mean((Boston_test$medv-boston.bag.pred)^2)
+test.mse.bag
+```
+Here we observe that train mse is reduced to `r train.mse.bag` & test mse has reduced to `r test.mse.bag` 
+which is way less that previous models
+
+**CV Bagging**
+```{r}
+set.seed(450)
+cv.error <- NULL
+k <- 10
+
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k){
+    index <- sample(1:nrow(Boston),round(0.9*nrow(Boston)))
+    train.cv <- Boston[index,]
+    test.cv <- Boston[-index,]
+    
+    boston.bg.cv<- randomForest(medv~., data = train.cv,mtry=ncol(train.cv)-1,ntree=500, importance=TRUE)
+    
+    pt<-predict(boston.bg.cv, test.cv, n.trees = 1000)
+     cv.error[i]<-mean((test.cv$medv-pt)^2)
+    
+    pbar$step()
+}
+cv_bg<-mean(cv.error)
+```
+The cross validation error for RF is `r cv_bg`
+
+**Plot of predicted vs actual values**
+```{r}
+par(mfrow=c(1,2))
+plot(boston.bag.pred.TR,Boston_train$medv,col=4, lwd=0, xlab = "predicted values", ylab = "Actual Values", main="Training data or OOBE")
+abline(c(0,1),col=2)
+
+plot(boston.bag.pred,Boston_test$medv,col=4, lwd=0, xlab = "predicted values", ylab = "Actual Values",main="Testing data")
+abline(c(0,1),col=2)
+```
+
+## 8.0 Random Forest
+
+*Used m=sqrt(p)*
+
+```{r}
+#library(randomForest)
+boston.rf<- randomForest(medv~., data = Boston_train,mtry=round(sqrt(ncol(Boston_train)),0),ntree=500, importance=TRUE)
+boston.rf
+```
+**OOB ERROR**
+The MSR is MSE of out-of-bag prediction (recall the OOB in bagging). The fitted randomForest actually saves all OOB errors for each ntree value from 1 to 500. We can make a plot to see how the OOB error changes with different ntree.
+```{r}
+hist(boston.rf$mse,col=3, lwd=2)
+plot(boston.rf$mse,type='l', col=2, lwd=2, xlab = "ntree", ylab = "OOB Error") 
+#why this error keeps falling?
+```
+**MSE on Training Sample**
+```{r}
+boston.rf.pred.TR<- predict(boston.rf)
+train.mse.rf<-mean((Boston_train$medv-boston.rf.pred.TR)^2)
+train.mse.rf
+```
+Hence, MSR is actually OOB Error on training data.
+
+**MSPE on testing Sample**
+```{r}
+boston.rf.pred<- predict(boston.rf, Boston_test)
+test.mse.rf<-mean((Boston_test$medv-boston.rf.pred)^2)
+test.mse.rf
+```
+Here we observe that train mse is reduced to `r train.mse.rf` & test mse has reduced to `r test.mse.rf` 
+which is way less that previous models
+
+**CV Random Forest**
+```{r}
+set.seed(450)
+cv.error <- NULL
+k <- 10
+
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k){
+    index <- sample(1:nrow(Boston),round(0.9*nrow(Boston)))
+    train.cv <- Boston[index,]
+    test.cv <- Boston[-index,]
+    
+    boston.rf.cv<- randomForest(medv~., data = train.cv,mtry=round(sqrt(ncol(train.cv)),0),ntree=500, importance=TRUE)
+    
+    pt<-predict(boston.rf.cv, test.cv, n.trees = 1000)
+     cv.error[i]<-mean((test.cv$medv-pt)^2)
+    
+    pbar$step()
+}
+cv_rf<-mean(cv.error)
+```
+The cross validation error for RF is `r cv_rf`
+
+**Plot of predicted vs actual values**
+```{r}
+par(mfrow=c(1,2))
+plot(boston.rf.pred.TR,Boston_train$medv,col=3, lwd=0, xlab = "predicted values", ylab = "Actual Values", main="Training data or OOBE")
+abline(c(0,1),col=2)
+
+plot(boston.rf.pred,Boston_test$medv,col=3, lwd=0, xlab = "predicted values", ylab = "Actual Values",main="Testing data")
+abline(c(0,1),col=2)
+```
+
+**Variable Importance**
+```{r}
+varImpPlot(boston.rf,col=2)
+```
+The variable importance plot tells us that lstat & rm are far more important variables than the rest. This plot gives us an comparative significance of variables.
+
+## 9.0 Boosting
+```{r}
+#
+boston.boost<- gbm(medv~., data = Boston_train, distribution = "gaussian", n.trees = 1000, shrinkage = 0.01, interaction.depth = 8)
+summary(boston.boost)
+
+```
+**Prediction on Training sample**
+```{r}
+boston.boost.pred.train<- predict(boston.boost, n.trees = 1000)
+mse.train.Bst<-mean((Boston_train$medv-boston.boost.pred.train)^2)
+mse.train.Bst
+```
+**Prediction on testing sample**
+```{r}
+boston.boost.pred.test<- predict(boston.boost, Boston_test, n.trees = 1000)
+mse.test.Bst<-mean((Boston_test$medv-boston.boost.pred.test)^2)
+mse.test.Bst
+```
+**CV Boosting**
+```{r}
+set.seed(450)
+cv.error <- NULL
+k <- 10
+
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k){
+    index <- sample(1:nrow(Boston),round(0.9*nrow(Boston)))
+    train.cv <- Boston[index,]
+    test.cv <- Boston[-index,]
+    
+    boston.boost.cv<- gbm(medv~., data = train.cv, distribution = "gaussian", n.trees = 1000, shrinkage = 0.01, interaction.depth = 8)
+    
+    pt<-predict(boston.boost.cv, test.cv, n.trees = 1000)
+     cv.error[i]<-mean((test.cv$medv-pt)^2)
+    
+    pbar$step()
+}
+cv_boost<-mean(cv.error)
+```
+The cv error estimate for Boosting is `r cv_boost`
+
+**Plot of predicted vs actual values for Boosting**
+```{r}
+par(mfrow=c(1,2))
+plot(boston.boost.pred.train,Boston_train$medv,col=3, lwd=0, xlab = "predicted values", ylab = "Actual Values", main="Training data")
+abline(c(0,1),col=2)
+
+plot(boston.boost.pred.test,Boston_test$medv,col=3, lwd=0, xlab = "predicted values", ylab = "Actual Values",main="Testing data")
+abline(c(0,1),col=2)
+```
+
+## 10.0 GAM: Generalized additive Model
+
+Inorder to fit a GAM model, it is imperative to understand the distribution of predictors. This helps speculate the nonlinearity of predictors. 
+
+In boston dataset, Column: chas & rad are labeled as continious but posses discreet values.
+Hence, a non-linear smoothing function is inappropriate.
+
+```{r}
+Boston.gam <-gam(medv ~ s(crim)+s(zn)+s(indus)+chas+s(nox)+s(rm)+s(age)+s(dis)+rad+s(tax)+s(ptratio)+s(black)+s(lstat),data=Boston_train)
+summary(Boston.gam)
+```
+**Inference**
+Here we can further notice that columns *zn*,*age*,*pratio*,*black* have Linear distribution. This is evident from effective degrees of freedom=1. 
+This is confirmed that the marginal plots of the same predictors
+```{r}
+plot(Boston.gam,pages=1)
+```
+```{r}
+Boston.gam_adv <-gam(medv ~ s(crim)+zn+s(indus)+chas+s(nox)+s(rm)+age+s(dis)+rad+s(tax)+
+ptratio+black+s(lstat), data=Boston_train)
+bostonGamsummary<-summary(Boston.gam_adv)
+bostonGamsummary
+```
+
+The cross Validation error is 11.46
+
+**Model Criterians**
+
+```{r}
+AIC(Boston.gam_adv)
+BIC(Boston.gam_adv)
+Boston.gam_adv$deviance
+```
+
+Prediction Accuracy 
+**Insample**
+
+```{r}
+#in-sample mse using df 
+(Boston.gam.mse.train <- Boston.gam_adv$dev/Boston.gam_adv$df.residual) 
+#or
+Boston.gam_adv$dev/(nrow(Boston_train)-sum(influence(Boston.gam_adv))) #mdf
+
+
+#Average Sum of Squared Error
+(Boston.gam.mse.train <- Boston.gam_adv$dev/nrow(Boston_train))
+#using the predict() function
+pi <- predict(Boston.gam_adv,Boston_train)
+mean((pi - Boston_train$medv)^2)
+```
+**Out of sample**
+```{r}
+Boston.gam.predict.test <-predict(Boston.gam_adv,Boston_test) #Boston.gam built on training data
+Boston_gam_mse_test <-mean((Boston.gam.predict.test-Boston_test[, "medv"])^2) ## out of sample
+Boston_gam_mse_test
+
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(Boston_train$medv,pi,col='blue',main='Real vs predicted GAM',pch=16,cex=0.6)
+abline(lm(pi~Boston_train$medv))
+legend('bottomright',legend='Train',pch=18,col='blue', bty='n')
+
+plot(Boston_test$medv,Boston.gam.predict.test,col='blue',main='Real vs predicted GAM',pch=16,cex=0.6)
+abline(lm(Boston.gam.predict.test~Boston_test$medv))
+legend('bottomright',legend='Test',pch=18,col='blue', bty='n')
+```
+
+**Inference**
+It's observed that GCV error is 11.435
+
+## 11.0 Neural Network
+```{r}
+set.seed(1338364)
+maxs <- apply(Boston, 2, max) 
+mins <- apply(Boston, 2, min)
+
+scaled <- as.data.frame(scale(Boston, center = mins, scale = maxs - mins))
+index <- sample(1:nrow(Boston),round(0.75*nrow(Boston)))
+
+train_ <- scaled[index,]
+test_ <- scaled[-index,]
+```
+
+```{r}
+n <- names(train_)
+f <- as.formula(paste("medv ~", paste(n[!n %in% "medv"], collapse = " + ")))
+nn <- neuralnet(f,data=train_,hidden=c(5,3),linear.output=T)
+plot(nn)
+```
+In sample Predictions
+```{r}
+pr.nn <- compute(nn,train_[,1:13])
+pr.nn_tr <- pr.nn$net.result*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)#prediction
+train.r <- (train_$medv)*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)#actual value to compare
+# MSE of testing set
+MSE.nn_train <- sum((train.r - pr.nn_tr)^2)/nrow(train_)
+MSE.nn_train
+```
+Out of sample Predictions
+```{r}
+pr.nn <- compute(nn,test_[,1:13])
+
+pr.nn_ <- pr.nn$net.result*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+test.r <- (test_$medv)*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+# MSE of testing set
+MSE.nn <- sum((test.r - pr.nn_)^2)/nrow(test_)
+MSE.nn
+```
+```{r}
+par(mfrow=c(1,2))
+
+plot(train_$medv,pr.nn_tr,col='red',main='Real vs predicted NN',pch=16,cex=0.6)
+abline(lm(pr.nn_tr~train_$medv))
+legend('bottomright',legend='Train',pch=18,col='red', bty='n')
+
+plot(test_$medv,pr.nn_,col='red',main='Real vs predicted NN',pch=16,cex=0.6)
+abline(lm(pr.nn_~test_$medv))
+legend('bottomright',legend='Test',pch=18,col='red', bty='n')
+
+```
+
+**Inference**
+We can see that the values of  train MSE has decreased substantially, But on the other hand the out of sample error did not reduce much.
+
+Lets try a different initialization
+
+```{r}
+set.seed(500)
+maxs <- apply(Boston, 2, max) 
+mins <- apply(Boston, 2, min)
+
+scaled <- as.data.frame(scale(Boston, center = mins, scale = maxs - mins))
+index <- sample(1:nrow(Boston),round(0.75*nrow(Boston)))
+
+train_ <- scaled[index,]
+test_ <- scaled[-index,]
+```
+
+```{r}
+n <- names(train_)
+f <- as.formula(paste("medv ~", paste(n[!n %in% "medv"], collapse = " + ")))
+nn <- neuralnet(f,data=train_,hidden=c(5,3),linear.output=T)
+plot(nn)
+```
+In sample Predictions
+```{r}
+pr.nn <- compute(nn,train_[,1:13])
+pr.nn_tr <- pr.nn$net.result*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)#prediction
+train.r <- (train_$medv)*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)#actual value to compare
+# MSE of testing set
+MSE.nn_train <- sum((train.r - pr.nn_tr)^2)/nrow(train_)
+MSE.nn_train
+```
+Out of sample Predictions
+```{r}
+pr.nn <- compute(nn,test_[,1:13])
+
+pr.nn_ <- pr.nn$net.result*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+test.r <- (test_$medv)*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+# MSE of testing set
+MSE.nn <- sum((test.r - pr.nn_)^2)/nrow(test_)
+MSE.nn
+```
+```{r}
+par(mfrow=c(1,2))
+
+plot(train_$medv,pr.nn_tr,col='purple',main='Real vs predicted NN',pch=16,cex=0.6)
+abline(lm(pr.nn_tr~train_$medv))
+legend('bottomright',legend='Train',pch=18,col='purple', bty='n')
+
+plot(test_$medv,pr.nn_,col='purple',main='Real vs predicted NN',pch=16,cex=0.6)
+abline(lm(pr.nn_~test_$medv))
+legend('bottomright',legend='Test',pch=18,col='purple', bty='n')
+
+```
+This proves the importance of a good starting point in neural nets...
+
+**CV NN**
+```{r}
+set.seed(450)
+cv.error <- NULL
+k <- 10
+
+pbar <- create_progress_bar('text')
+pbar$init(k)
+
+for(i in 1:k){
+    index <- sample(1:nrow(Boston),round(0.9*nrow(Boston)))
+    train.cv <- scaled[index,]
+    test.cv <- scaled[-index,]
+    
+    nn <- neuralnet(f,data=train.cv,hidden=c(5,2),linear.output=T)
+    
+    pr.nn <- compute(nn,test.cv[,1:13])
+    pr.nn <- pr.nn$net.result*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+    
+    test.cv.r <- (test.cv$medv)*(max(Boston$medv)-min(Boston$medv))+min(Boston$medv)
+    
+    cv.error[i] <- sum((test.cv.r - pr.nn)^2)/nrow(test.cv)
+    
+    pbar$step()
+}
+cvnn<-mean(cv.error)
+```
+
+The cross Validation error for this is `r cvnn`
+
+## 12.0 Insights
+
+<img src="images/part1.png" height="550px" width="750px" />
+<img src="images/part2.png" height="550px" width="750px" />
+<img src="images/part3.png" height="550px" width="750px" />
+
+Key takeaways:
+
+*Cross validation is more stable and reliable than out of sample validation test set values
+
+*LOOCV : Resampling does not change the LOOCV error value
+
+*MSPE can also sometime be less than in-sample value of error (MSE)
+
+*CART: Re sampling causes the training set to differ, because of which the splitting is changed hence the MSE & MSPE values also differ.
+
+*We observe that at times Linear Regression and at times Decision trees perform better than each other. Mostly it looks like it depends on sampled data. If we closely look in sample MSE is less for DT than for LR & Out of sample MSE does not show any pattern(it is sometimes higher sometimes lower than LR) .Hence, Neither Linear Regression or Decision Trees are better than the other.
+We already know that  LR works really nicely when the data has a linear shape. But, when the data has a non-linear shape, then a linear model cannot capture the non-linear features.So in this case, you can use the decision trees, which do a better job at capturing the non-linearity in the data by dividing the space into smaller sub-spaces depending on the questions asked.
+
+*Advanced Trees: We observe that advanced trees are much better are predicting the prices as compared to any conventional methods.In this project we observed Boosting performed the best among the Bagging and Random forest,which is obvious expectation because Boosting imples a mechanism to pay close attention to errors of last iteration.
+No wonder these methods(RF & Boosting) are state of the art and extensively used in the market today.
+But when these conventional methods are compared to advanced tree methods , Advanced trees are bound to out perform the conventional methods. 
+
+*Gams perform better when we have nonlinearity in continious predictors.
+
+*NN Performance is quite dependent on initial values for them to actually converge at global minimas.
+
+**Conclusion**
+Looking at the prediction performance of various Algotithms for this data set, it can be concluded that Gradient Boosting performs the best. Overall,Random Forest also gave better performance although not as good as GB!.
+
+
+
+
+
