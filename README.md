@@ -12,9 +12,9 @@
  ### 1.3 Predicting occuracnce of Heart Disease
  Applying Machine Learning approaches(and eventually comparing them) for classifying whether a person is suffering from heart disease or  not, using one of the most used dataset — Cleveland Heart Disease dataset from the UCI Repository
  
- ## 3. Unsupervised Learning
+ ## 2. Unsupervised Learning
  
- ### 3.1 K-means and Hierachical
+ ### 2.1 K-means and Hierachical
  Applied K-means and Hierachical clustering mechanisms on european jobs dataset to group the countries that have more similar jobs.
  
  ## 3. Exploratory Data Analysis
