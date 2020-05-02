@@ -11,21 +11,26 @@
  
  ### 1.3 Predicting occuracnce of Heart Disease
  Applying Machine Learning approaches(and eventually comparing them) for classifying whether a person is suffering from heart disease or  not, using one of the most used dataset — Cleveland Heart Disease dataset from the UCI Repository
-  
- ## 2. Exploratory Data Analysis
  
- ### 2.1 Real estate Investment Analysis: 
+ ## 3. Unsupervised Learning
+ 
+ ###3.1 K-means and Hierachical
+ Applied K-means and Hierachical clustering mechanisms on european jobs dataset to group the countries that have more similar jobs.
+ 
+ ## 3. Exploratory Data Analysis
+ 
+ ### 3.1 Real estate Investment Analysis: 
  Worked on Airbnb and Zillow data from Kaggle to build a data product to find zip codes that are most profitable to invest in for short term rentals.
  
- ### 2.2 Iris Flower EDA
+ ### 3.2 Iris Flower EDA
  An extensive EDA is performed for this very popular ML dataset. This helps understand the intricacies of data using different visualizations and the nuances between plots.
  
- ## 3. Statistical Modelling
+ ## 4. Statistical Modelling
  
- ### 3.1 Predict landing distance of commercial Flight
+ ### 4.1 Predict landing distance of commercial Flight
  To study what factors and how they would impact the landing distance of a commercial flight using Linear Regression.
 
- ### 3.2 Predict Risky and Long landing of commercial Flight
+ ### 4.2 Predict Risky and Long landing of commercial Flight
  To study what factors and how they would indicate a risky or long landing of a commercial flight. The response Binary (1,0) for Risky    and Long Landing
 
  ### 3.3 Multinomial Regression of FAA Data
