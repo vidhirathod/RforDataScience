@@ -14,7 +14,7 @@
  
  ## 3. Unsupervised Learning
  
- ###3.1 K-means and Hierachical
+ ### 3.1 K-means and Hierachical
  Applied K-means and Hierachical clustering mechanisms on european jobs dataset to group the countries that have more similar jobs.
  
  ## 3. Exploratory Data Analysis
